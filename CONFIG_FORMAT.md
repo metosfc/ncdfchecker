@@ -40,11 +40,11 @@ Here, the "required_" config entries are listed:
 Use this entry to list the set of global attributes you always want to be
 present in your netcdf file.
 
-Location: Top level entry in the dictionary
+**Location**: Top level entry in the dictionary
 
-Format: List of names of required attributes
+**Format**: List of names of required attributes
 
-Example: "required_global_attributes" : ["title", "short_name"]
+**Example**: "required_global_attributes" : ["title", "short_name"]
 
 ## required_attributes
 
@@ -53,11 +53,11 @@ A good example for this would be for use in a dimension's entry to define what
 units etc. you want it to have. This helps you ensure that any attributes you
 want to be present for your variable are always present.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: List of names of required attributes.
+**Format**: List of names of required attributes.
 
-Example: "lon" : { "required_attributes" : ["axis", "units"] }
+**Example**: "lon" : { "required_attributes" : ["axis", "units"] }
 
 ## required_intervals
 
@@ -69,20 +69,20 @@ be used in one of two ways.
 This is the simplest usage, for example specifying the number of degrees apart
 entries for lattitude may be.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: Numeric value of expected difference
+**Format**: Numeric value of expected difference
 
-Example: "lat" : { "required_intervals" : 10.0 }
+**Example**: "lat" : { "required_intervals" : 10.0 }
 
 2) Using within a variable to specify the expected interval of an associated
 variable
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: Dictionary specifying an associated variable and its required interval
+**Format**: Dictionary specifying an associated variable and its required interval
 
-Example: "tas" : { "required_intervals" : { "leadtime" : 6.0 } }
+**Example**: "tas" : { "required_intervals" : { "leadtime" : 6.0 } }
 
 This is useful when you want to have more than one variable within a file that
 have the same named associated variables but which may be different for each.
@@ -97,11 +97,11 @@ Use this to specify the expected minimum and maximum values. This is an
 *inclusive* setting so these values must be present. If you want values to fall
 within a specific range then use the "required_range" entry instead.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: Two item list as [min, max]
+**Format**: Two item list as [min, max]
 
-Example: "lon" : { "required_min_max": [0.5, 359.5] }
+**Example**: "lon" : { "required_min_max": [0.5, 359.5] }
 
 ## required_range
 
@@ -109,11 +109,11 @@ Use this to specify the (inclusive) range within which values must be. If you
 want the minimum and maximum values to be specific values, then use the
 "required_min_max" entry instead.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: Two item list as [min, max]
+**Format**: Two item list as [min, max]
 
-Example: "lon" : { "required_range": [0.0, 360.0] }
+**Example**: "lon" : { "required_range": [0.0, 360.0] }
 
 ## required_values
 
@@ -121,11 +121,11 @@ Use this to specify the values which the varible must have. This is an exact
 matching so, when inspecting the variable, even if all values are present the
 check will still fail if they are not in the expected order.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: List of items in the order you expect them as [item1, item2, ... itemN]
+**Format**: List of items in the order you expect them as [item1, item2, ... itemN]
 
-Example: "lon" : { "required_values": [0.0, 180.0, 360.0] }
+**Example**: "lon" : { "required_values": [0.0, 180.0, 360.0] }
 
 # Other reserved config items
 
@@ -133,22 +133,22 @@ Example: "lon" : { "required_values": [0.0, 180.0, 360.0] }
 
 Use this to specify the pattern you expect an entry to follow.
 
-Location: Within an attribute's definition
+**Location**: Within an attribute's definition
 
-Format: Python regular expression to match
+**Format**: Python regular expression to match
 
-Example: "creation_date": { "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d }
+**Example**: "creation_date": { "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d }
 
 ## bounds
 
 Use this to specify any associated bounds variables you want to have present in
 your file.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: List of associated bounds names
+**Format**: List of associated bounds names
 
-Example: "lon" : ["lon_bnds"]
+**Example**: "lon" : ["lon_bnds"]
 
 ## cell_methods
 
@@ -157,21 +157,21 @@ Use this to specify an expected cell_method associated with a variable.
 N.B. this can be a pattern where multiple possible cell methods are acceptable
 for a given entry.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: String or pattern for matching agains
+**Format**: String or pattern for matching agains
 
-Example 1: "lwee" : { "cell_methods": "leadtime: sum" }
+**Example 1**: "lwee" : { "cell_methods": "leadtime: sum" }
 
-Example 2: "rls" : { "cell_methods": "(leadtime: mean$|(leadtime: mean \\(interval: ?[0-9]*?.?[0-9]?[0-9] ?[a-z]*?\\)))" }
+**Example 2**: "rls" : { "cell_methods": "(leadtime: mean$|(leadtime: mean \\(interval: ?[0-9]*?.?[0-9]?[0-9] ?[a-z]*?\\)))" }
 
 ## dimensions
 
 Use this to ensure a variable has a particular set of dimensions associated
 with it and that they are in an expected order.
 
-Location: Within a variable's definition
+**Location**: Within a variable's definition
 
-Format: List of expected dimenstions
+**Format**: List of expected dimenstions
 
-Example: "tas" : { "dimensions" : ["time", "lat", "lon"] }
+**Example**: "tas" : { "dimensions" : ["time", "lat", "lon"] }
