@@ -16,7 +16,7 @@ with them. Loosely:
 
 ```
 {
-  "some_fields_shortname" : {
+  "name" : {
     "an_entry" : "a_value",
     "another_entry" : "another_value"
   }
@@ -148,7 +148,7 @@ your file.
 
 **Format**: List of associated bounds names
 
-**Example**: "lon" : ["lon_bnds"]
+**Example**: "lon" : { "bounds" : ["lon_bnds"] }
 
 ## cell_methods
 
@@ -159,7 +159,7 @@ for a given entry.
 
 **Location**: Within a variable's definition
 
-**Format**: String or pattern for matching agains
+**Format**: String or pattern for matching against
 
 **Example 1**: "lwee" : { "cell_methods": "leadtime: sum" }
 
@@ -172,6 +172,6 @@ with it and that they are in an expected order.
 
 **Location**: Within a variable's definition
 
-**Format**: List of expected dimenstions
+**Format**: List of expected dimensions
 
 **Example**: "tas" : { "dimensions" : ["time", "lat", "lon"] }
