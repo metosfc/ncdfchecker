@@ -222,7 +222,8 @@ def simple_variable_checks(product, constaints, strict=False, logger=None):
         # Catch completely unknown variables - those not in either the
         # constraints or list of allowed dimensions
         if variable not in constraints and \
-                variable not in constraints['allowed_dimensions']:
+                ('allowed_dimensions' in constraints and
+                 variable not in constraints['allowed_dimensions']):
             if strict:
                 logger.error("Unknown variable %s" % variable)
                 errcount += 1
