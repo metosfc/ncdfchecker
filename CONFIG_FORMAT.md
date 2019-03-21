@@ -46,6 +46,25 @@ present in your netcdf file.
 
 **Example**: "required_global_attributes" : ["title", "short_name"]
 
+N.B. the items from the list of required attributes can be present elsewhere in
+the file for further checking. For example:
+
+```
+"required_global_attributes" : ["title", "creation_date", "product"]
+...
+# Pattern matching of creation_date
+"creation_date": {
+    "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d"
+}
+...
+# List of acceptable values for title
+"title": ["My NCDF file", "My Other NCDF file"]
+...
+# Single acceptable value for product
+"product": ["My demo product"]
+
+```
+
 ## required_attributes
 
 Use this within the definition of a variable to define its required attributes.
