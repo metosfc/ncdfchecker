@@ -285,10 +285,13 @@ class TestProductValidator(unittest.TestCase):
 
     def test_check_logger_creation(self):
         """
-        Check the automatic creation of the logger object.
+        Check the automatic creation of the logger object. The test will 
+        fail if the logging object is not correctly defined.
         """
-        assert (check_globals(
-            self.data, test_constraints, strict=True, logger="a") == (0, 0))
+        try:
+            check_globals(self.data, test_constraints, logger="a")
+        except:
+            self.fail("Unexpected exception.")
 
 
 if __name__ == '__main__':
