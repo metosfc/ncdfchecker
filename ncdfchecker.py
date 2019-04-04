@@ -131,7 +131,7 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
     errcount = 0
     warncount = 0
 
-    if not logger:
+    if not isinstance(logger, logging.Logger):
         logger = initialise_logger(verbosity=logging.CRITICAL)
 
     for key in constraints['required_global_attributes']:
@@ -206,7 +206,7 @@ def simple_variable_checks(product, constaints, strict=False, logger=None):
     errcount = 0
     warncount = 0
 
-    if not logger:
+    if not isinstance(logger, logging.Logger):
         logger = initialise_logger(verbosity=logging.CRITICAL)
 
     for variable in product.variables:

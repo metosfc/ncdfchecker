@@ -283,6 +283,13 @@ class TestProductValidator(unittest.TestCase):
         assert (check_globals(
             self.data, unmet_constraints, strict=True) == (3, 0))
 
+    def test_check_logger_creation(self):
+        """
+        Check the automatic creation of the logger object.
+        """
+        assert (check_globals(
+            self.data, test_constraints, strict=True, logger="a") == (0, 0))
+
 
 if __name__ == '__main__':
     unittest.main()
