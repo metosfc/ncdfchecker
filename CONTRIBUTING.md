@@ -33,6 +33,7 @@ below:
 * Andrew Clark (Met Office, UK)
 * Nicola Martin (Met Office, UK)
 * Craig MacLachlan (Met Office, UK)
+* Jamie Kettleborough (Met Office, UK)
 
 (All contributors on GitHub are identifiable with email addresses in the
 version control logs or otherwise.)

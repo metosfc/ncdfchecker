@@ -38,6 +38,7 @@ import tempfile
 import time
 import numpy
 import netCDF4
+import logging
 
 from ncdfchecker import *
 
@@ -122,6 +123,27 @@ test_constraints = {
         "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d \\d\\d:\\d\\d"
     },
 }
+
+
+class StubLogger(logging.Logger):
+    """
+    Override reporting methods of logger
+    to make testing easier.
+    """
+
+    def __init__(self):
+        self.errors = []
+        self.infos = []
+        self.warns = []
+
+    def error(self, msg):
+        self.errors.append(msg)
+
+    def info(self, msg):
+        self.infos.append(msg)
+
+    def warn(self, msg):
+        self.warns.append(msg)
 
 
 class TestProductValidator(unittest.TestCase):
@@ -285,13 +307,46 @@ class TestProductValidator(unittest.TestCase):
 
     def test_check_logger_creation(self):
         """
-        Check the automatic creation of the logger object. The test will 
+        Check the automatic creation of the logger object. The test will
         fail if the logging object is not correctly defined.
         """
         try:
             check_globals(self.data, test_constraints, logger="a")
         except:
             self.fail("Unexpected exception.")
+
+    def test_simple_variable_checks(self):
+        """
+        Check simple_variable_checks runs and finds a warning
+        because the constraint does not define time tests.
+        """
+        alogger = StubLogger()
+        result = simple_variable_checks(self.data, test_constraints,
+                                        logger=alogger)
+        assert result == (0, 1)
+        assert alogger.errors == []
+        assert alogger.infos[0] == 'Checking time'
+        assert alogger.warns == ['Unknown Variable time']
+
+    def test_variable_below_range(self):
+        """
+        Check an error is logged if the data values of a variable
+        go below the required range.
+
+        The test data is random from 0-1. There is a chance that
+        this test will fail if the random distribution samples only values
+        bigger than 0.5.  This is very small (I think
+        0.5**(nlon*nlat*ntimes)).
+        """
+
+        alogger = StubLogger()
+        unmet_constraints = copy.deepcopy(test_constraints)
+        unmet_constraints['testfield']['required_range'] = [0.5, 1.5]
+        result = simple_variable_checks(self.data, unmet_constraints,
+                                        logger=alogger)
+        assert result == (1, 1)
+        assert (alogger.errors[0] ==
+                'testfield : required_range - outside allowed range')
 
 
 if __name__ == '__main__':

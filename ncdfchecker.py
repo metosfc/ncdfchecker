@@ -198,7 +198,7 @@ def check_stepsize(data, stepsize):
     return np.all(steparr == stepsize)
 
 
-def simple_variable_checks(product, constaints, strict=False, logger=None):
+def simple_variable_checks(product, constraints, strict=False, logger=None):
     """
     Carry out simple checks based on variables present in product
     """
