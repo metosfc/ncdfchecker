@@ -31,6 +31,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import datetime
+import dateutil
+import dateutil.parser
+import dateutil.rrule
 import json
 import logging
 import re
@@ -165,7 +169,7 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
                         else:
                             logger.error(
                                 "Check for %s, %s not implemented" %
-                                (key, confkey))
+                                (key, conkey))
                             errcount += 1
                 else:
                     logger.warn("Constraint on %s is not defined" % key)
@@ -189,16 +193,66 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
     return errcount, warncount
 
 
-def check_stepsize(data, stepsize):
+def get_month_midpoints(monthslist):
+    """Return a list of dates that correspond to the middle of the month."""
+    def midpoint(start, end): return start + (end - start) / 2
+
+    midmonths = [midpoint(monthslist[i], monthslist[i+1])
+                 for i in range(len(monthslist)-1)]
+
+    return midmonths
+
+
+def get_expected_monthly_stepsize(initdate, runlength):
     """
-    Helper routine to check that the stepsize in some given data is equal to
-    a given value
+    Using the model initialisation date and run length, calculate the
+    expected step size between entries in a monthly file. Use the midpoint
+    in each month to calculate said step size.
+
+    :arg: string initdate : Model initialisation date
+    :arg: int runlength   : Model run length in days
+
+    """
+    SECS_IN_HR = 60 * 60
+
+    initdate = dateutil.parser.parse(initdate)
+    enddate = initdate + datetime.timedelta(days=runlength)
+
+    # Get a list of monthly dates that correspond to whole months that
+    # have been covered by the model run.
+    complete_months = list(
+        dateutil.rrule.rrule(dateutil.rrule.MONTHLY, bymonthday=1,
+                             dtstart=initdate, until=enddate)
+        )
+
+    midmonths = np.array(get_month_midpoints(complete_months))
+
+    expected_stepsize = midmonths[1:len(midmonths)] - \
+        midmonths[0:len(midmonths)-1]
+
+    return [timedelta.total_seconds() / SECS_IN_HR
+            for timedelta in expected_stepsize]
+
+
+def check_stepsize(data, stepsize, monthly=False):
+
+    """
+    Helper routine to check that the stepsize in some given data is
+    equal to a given value. Monthly step sizes are dependent on the
+    months covered on the model run. We therefore compare these to an
+    array of expected values.
+
     """
     steparr = data[1:len(data)] - data[0:len(data)-1]
-    return np.all(steparr == stepsize)
+
+    if monthly:
+        return np.array_equal(steparr, stepsize)
+    else:
+        return np.all(steparr == stepsize)
 
 
-def simple_variable_checks(product, constraints, strict=False, logger=None):
+def simple_variable_checks(product, constraints, strict=False, logger=None,
+                           initdate=None, runlength=None):
     """
     Carry out simple checks based on variables present in product
     """
@@ -280,7 +334,22 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
                             if intervalkey in product.variables:
                                 arr = product[intervalkey][:]
                                 step = constraints[variable][key][intervalkey]
-                                if not check_stepsize(arr, step):
+
+                                monthly = step == 'mon'
+                                if monthly:
+                                    logger.info('This is a monthly file.')
+                                    if initdate is None or runlength is None:
+                                        msg = ('Interval checks for monthly '
+                                               'files require '
+                                               'initdate and runlength '
+                                               'arguments.')
+                                        logger.critical(msg)
+                                        sys.exit(1)
+
+                                    step = get_expected_monthly_stepsize(
+                                        initdate, runlength)
+
+                                if not check_stepsize(arr, step, monthly):
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))
                                     errcount += 1
@@ -376,6 +445,10 @@ if __name__ == "__main__":
                         help="If an unknown variable is encountered or fill "
                         "values specified but not used then it should be "
                         "considered an error.")
+    parser.add_argument('--initdate', '-i',
+                        help='Model initialisation date')
+    parser.add_argument('--runlength', '-l', type=int,
+                        help='Model run length in days')
     args = parser.parse_args()
 
     logger = initialise_logger(verbosity=args.quiet)
@@ -406,7 +479,8 @@ if __name__ == "__main__":
 
     # Variable Checks
     errs, warns = simple_variable_checks(product, constraints, args.strict,
-                                         logger=logger)
+                                         logger=logger, initdate=args.initdate,
+                                         runlength=args.runlength)
     errcount += errs
     warncount += warns
 
