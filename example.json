@@ -1,4 +1,10 @@
 {
+    "allowed_dimensions": [
+        "plev",
+        "depth",
+        "height",
+        "realization"
+    ],
     "creation_date": {
         "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d \\d\\d:\\d\\d"
     }, 
