@@ -32,9 +32,7 @@
 
 import argparse
 import datetime
-import dateutil
 import dateutil.parser
-import dateutil.rrule
 import json
 import logging
 import re
@@ -193,48 +191,39 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
     return errcount, warncount
 
 
-def get_month_midpoints(monthslist):
-    """Return a list of dates that correspond to the middle of the month."""
-    def midpoint(start, end): return start + (end - start) / 2
-
-    midmonths = [midpoint(monthslist[i], monthslist[i+1])
-                 for i in range(len(monthslist)-1)]
-
-    return midmonths
-
-
-def get_expected_monthly_stepsize(initdate, runlength):
+def get_period_stepsize(leadtimes, forecast_ref_time, period):
     """
-    Using the model initialisation date and run length, calculate the
-    expected step size between entries in a monthly file. Use the midpoint
-    in each month to calculate said step size.
-
-    :arg: string initdate : Model initialisation date
-    :arg: int runlength   : Model run length in days
+    Get the stepsize over the specified period
 
     """
-    SECS_IN_HR = 60 * 60
+    NMONTHS = 12
 
-    initdate = dateutil.parser.parse(initdate)
-    enddate = initdate + datetime.timedelta(days=runlength)
+    # Leadtimes given in the file are expressed in hours since the
+    # forecast reference time (i.e. forecast start date), so we need
+    # to convert these into datetime objects before we can expressed
+    # the required period to check the intervl for.
+    ref_time = dateutil.parser.parse(forecast_ref_time)
 
-    # Get a list of monthly dates that correspond to whole months that
-    # have been covered by the model run.
-    complete_months = list(
-        dateutil.rrule.rrule(dateutil.rrule.MONTHLY, bymonthday=1,
-                             dtstart=initdate, until=enddate)
-        )
+    datetimes = [
+        ref_time + datetime.timedelta(hours=leadtime)
+        for leadtime in leadtimes
+    ]
 
-    midmonths = np.array(get_month_midpoints(complete_months))
+    # Get the appropriate time period (year, month, day etc), and then
+    # determine the interval along that period. Month intervals need to be
+    # converted into modulo 12 to handle year changes.
+    periods = np.array([
+        getattr(datetime, period) for datetime in datetimes
+    ])
 
-    expected_stepsize = midmonths[1:len(midmonths)] - \
-        midmonths[0:len(midmonths)-1]
+    stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
+    if period == 'month':
+        stepsizes %= NMONTHS
 
-    return [timedelta.total_seconds() / SECS_IN_HR
-            for timedelta in expected_stepsize]
+    return stepsizes
 
 
-def check_stepsize(data, stepsize, monthly=False):
+def check_stepsize(data, stepsize, forecast_ref_time=None, period=None):
 
     """
     Helper routine to check that the stepsize in some given data is
@@ -243,16 +232,17 @@ def check_stepsize(data, stepsize, monthly=False):
     array of expected values.
 
     """
-    steparr = data[1:len(data)] - data[0:len(data)-1]
-
-    if monthly:
-        return np.array_equal(steparr, stepsize)
+    # If no period is specified, just check the hourly interval in the
+    # data, otherwise we check the interval for the specified period.
+    if period is None:
+        steparr = data[1:len(data)] - data[0:len(data)-1]
     else:
-        return np.all(steparr == stepsize)
+        steparr = get_period_stepsize(data, forecast_ref_time, period)
+
+    return np.all(steparr == stepsize)
 
 
-def simple_variable_checks(product, constraints, strict=False, logger=None,
-                           initdate=None, runlength=None):
+def simple_variable_checks(product, constraints, strict=False, logger=None):
     """
     Carry out simple checks based on variables present in product
     """
@@ -335,21 +325,21 @@ def simple_variable_checks(product, constraints, strict=False, logger=None,
                                 arr = product[intervalkey][:]
                                 step = constraints[variable][key][intervalkey]
 
-                                monthly = step == 'mon'
-                                if monthly:
-                                    logger.info('This is a monthly file.')
-                                    if initdate is None or runlength is None:
-                                        msg = ('Interval checks for monthly '
-                                               'files require '
-                                               'initdate and runlength '
-                                               'arguments.')
-                                        logger.critical(msg)
-                                        sys.exit(1)
+                                fcst_ref_time = product.forecast_reference_time
+                                # Check that monthly or yearly files
+                                # have a stepsize of 1 month or 1
+                                # year. Otherwise we use the hourly
+                                # value specified in the json file.
+                                period = None
+                                if isinstance(step, str):
+                                    if step in ['month', 'year']:
+                                        period, step = step, 1
+                                    else:
+                                        sys.exit(f'Interval checks for period '
+                                                 '{step} not yet implemented.')
 
-                                    step = get_expected_monthly_stepsize(
-                                        initdate, runlength)
-
-                                if not check_stepsize(arr, step, monthly):
+                                if not check_stepsize(arr, step, fcst_ref_time,
+                                                      period):
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))
                                     errcount += 1
@@ -445,10 +435,6 @@ if __name__ == "__main__":
                         help="If an unknown variable is encountered or fill "
                         "values specified but not used then it should be "
                         "considered an error.")
-    parser.add_argument('--initdate', '-i',
-                        help='Model initialisation date')
-    parser.add_argument('--runlength', '-l', type=int,
-                        help='Model run length in days')
     args = parser.parse_args()
 
     logger = initialise_logger(verbosity=args.quiet)
@@ -479,8 +465,8 @@ if __name__ == "__main__":
 
     # Variable Checks
     errs, warns = simple_variable_checks(product, constraints, args.strict,
-                                         logger=logger, initdate=args.initdate,
-                                         runlength=args.runlength)
+                                         logger=logger)
+
     errcount += errs
     warncount += warns
 

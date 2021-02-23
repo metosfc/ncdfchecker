@@ -119,8 +119,9 @@ test_constraints = {
         "title",
         "source",
         "creation_date",
+        "forecast_reference_time",
         "frequency",
-        "short_name"
+        "short_name",
     ],
     "creation_date": {
         "pattern": "\\d\\d\\d\\d-\\d\\d-\\d\\d \\d\\d:\\d\\d"
@@ -137,7 +138,7 @@ monthly_field = {"testfield_monthly": {
     "frequency": "mon",
     "long_name": "Monthly Test Field",
     "required_intervals": {
-        "leadtime": "mon"
+        "leadtime": "month"
     },
     "required_range": [
         0,
@@ -231,6 +232,7 @@ class TestProductValidator(unittest.TestCase):
         data.creation_date = time.strftime("%Y-%m-%d %H:%M")
         data.frequency = "6hr"
         data.short_name = "testfield"
+        data.forecast_reference_time = '1993-01-01T00:00:00Z'
 
         data.close()
 
@@ -332,7 +334,8 @@ class TestProductValidator(unittest.TestCase):
         Test check_globals strict mode expected failure
         """
         unmet_constraints = copy.deepcopy(test_constraints)
-        unmet_constraints['required_global_attributes'] = ["title", "source"]
+        unmet_constraints['required_global_attributes'] = [
+            "title", "source", "forecast_reference_time"]
         assert (check_globals(
             self.data, unmet_constraints, strict=True) == (3, 0))
 
@@ -384,10 +387,8 @@ class TestMonthlyProductValidator(unittest.TestCase):
     def setUp(self):
         self.create_example_files()
         self.data = load_input(datapath)
-        self.initdate = '19940409'
-        self.runlength = 216
-        self.expected_stepsize_arr = get_expected_monthly_stepsize(
-            self.initdate, self.runlength)
+        self.monthly_step = 1
+        self.by_month = 'month'
 
     def tearDown(self):
         """
@@ -453,6 +454,7 @@ class TestMonthlyProductValidator(unittest.TestCase):
         data.creation_date = time.strftime("%Y-%m-%d %H:%M")
         data.frequency = "mon"
         data.short_name = "testfield_monthly"
+        data.forecast_reference_time = '1994-04-09T00:00:00Z'
 
         data.close()
 
@@ -473,23 +475,27 @@ class TestMonthlyProductValidator(unittest.TestCase):
         Test check correct monthly stepsize matching.
         """
         assert check_stepsize(
-            self.data['leadtime'][:], self.expected_stepsize_arr)
+            self.data['leadtime'][:], self.monthly_step,
+            self.data.forecast_reference_time, self.by_month)
 
     def test_check_stepsize_fail(self):
         """
         Check failure upon monthly stepsize mismatch.
         """
-        wrong_stepsizes = numpy.array([732., 732., 732., 744., 732.])
+        step = self.monthly_step + 1
 
         assert not check_stepsize(
-            wrong_stepsizes, self.expected_stepsize_arr)
+            self.data['leadtime'][:], step,
+            self.data.forecast_reference_time, self.by_month)
 
-    def test_check_stepsize_bad_size_fail(self):
+    def test_check_stepsize_irregular_stepsize_fail(self):
         """
         Check failure upon mismatch due to incorrect length of stepsize array.
         """
+        irregular = numpy.array([900., 3840., 4572.])
         assert not check_stepsize(
-            self.data['leadtime'][:], self.expected_stepsize_arr[1:])
+            irregular, self.monthly_step,
+            self.data.forecast_reference_time, self.by_month)
 
     def test_simple_variable_checks(self):
         """
@@ -498,8 +504,7 @@ class TestMonthlyProductValidator(unittest.TestCase):
         """
         alogger = StubLogger()
         result = simple_variable_checks(self.data, monthly_test_constraints,
-                                        logger=alogger, initdate=self.initdate,
-                                        runlength=self.runlength)
+                                        logger=alogger)
 
         assert result == (0, 1)
         assert alogger.errors == []
@@ -507,79 +512,22 @@ class TestMonthlyProductValidator(unittest.TestCase):
         assert alogger.warns == ['Unknown Variable leadtime']
 
 
-class TestGetMonthMidpoints(unittest.TestCase):
-
-    def test_get_month_midpoints__non_leap(self):
-        """
-        Check the correct dates corresponding to the middle of the
-        month are returned for a non-leap year.
-        """
-        dates = [datetime.datetime(1993, 1, 1),
-                 datetime.datetime(1993, 2, 1),
-                 datetime.datetime(1993, 3, 1),
-                 datetime.datetime(1993, 4, 1)]
-
-        expected_midpoints = [
-            datetime.datetime(1993, 1, 16, 12, 0, 0),
-            datetime.datetime(1993, 2, 15, 0, 0, 0),
-            datetime.datetime(1993, 3, 16, 12, 0, 0)]
-
-        self.assertEqual(
-            expected_midpoints, get_month_midpoints(dates))
-
-    def test_get_month_midpoints__leap(self):
-        """
-        Check the correct dates corresponding to the middle of the
-        month are returned for a leap year.
-        """
-        dates = [datetime.datetime(2020, 1, 1),
-                 datetime.datetime(2020, 2, 1),
-                 datetime.datetime(2020, 3, 1),
-                 datetime.datetime(2020, 4, 1)]
-
-        expected_midpoints = [
-            datetime.datetime(2020, 1, 16, 12, 0, 0),
-            datetime.datetime(2020, 2, 15, 12, 0, 0),
-            datetime.datetime(2020, 3, 16, 12, 0, 0)]
-
-        self.assertEqual(
-            expected_midpoints, get_month_midpoints(dates))
-
-    def test_get_month_midpoints__edge(self):
-        """
-        Check the correct dates corresponding to the middle of the
-        month are returned when crossing into a New Year.
-        """
-        dates = [datetime.datetime(2020, 11, 1),
-                 datetime.datetime(2020, 12, 1),
-                 datetime.datetime(2021, 1, 1),
-                 datetime.datetime(2021, 2, 1)]
-
-        expected_midpoints = [
-            datetime.datetime(2020, 11, 16, 0, 0, 0),
-            datetime.datetime(2020, 12, 16, 12, 0, 0),
-            datetime.datetime(2021, 1, 16, 12, 0, 0)]
-
-        self.assertEqual(
-            expected_midpoints, get_month_midpoints(dates))
-
-
-class TestGetExpectedMonthlyStepsize(unittest.TestCase):
+class TestGetPeriodStepsize(unittest.TestCase):
 
     def setUp(self):
-        self.runlength = 216
+        self.period = 'month'
 
     def test_get_expected_monthly_stepsize__month_start(self):
         """
         Check the correct step size array is returned when the
         model initialisation date is at the start of the month.
         """
-        initdate = '19950401'
-        expected_stepsizes = np.array([
-            732., 732., 732., 744., 732., 732.])
+        ref_time = '1995-04-01T00:00:00Z'
+        leadtimes = np.array([360., 1092., 1824., 2556., 3300., 4032., 4764.])
+        expected_stepsizes = np.array([1., 1., 1., 1., 1., 1.])
 
-        stepsizes = get_expected_monthly_stepsize(
-            initdate, self.runlength)
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
+        print(stepsizes)
 
         self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
 
@@ -589,12 +537,25 @@ class TestGetExpectedMonthlyStepsize(unittest.TestCase):
         initialisation date is not at the start of the month.
 
         """
-        initdate = '19940409'
-        expected_stepsizes = np.array([
-            732., 732., 744., 732., 732.])
+        ref_time = '1994-04-09T00:00:00Z'
+        leadtimes = np.array([900., 1632., 2364., 3108., 3840., 4572.])
+        expected_stepsizes = np.array([1., 1., 1., 1., 1.])
 
-        stepsizes = get_expected_monthly_stepsize(
-            initdate, self.runlength)
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
+
+        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+
+    def test_get_expected_monthly_stepsize__edge(self):
+        """
+        Check that the correct size array is returned when we cross into a
+        new year.
+
+        """
+        ref_time = '2020-11-01T00:00:00Z'
+        leadtimes = np.array([360., 1092., 1836., 2544., 3252., 3984.])
+        expected_stepsizes = np.array([1., 1., 1., 1., 1.])
+
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
 
         self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
 
