@@ -110,16 +110,10 @@ For example you may have be outputting various variables at different timesteps
 depending on what that variable is e.g. tas with a leadtime of 6.0 while tauv
 has a leadtime of 24.
 
-However, data time-steps for monthly files will not be constant, and will
-depend on which months are covered by the model run. To indicate that a
-particular field is output in monthly intervals, then "mon" needs to be
-specified in the "required_intervals" entry:
+To indicate that a particular field is output in monthly intervals,
+then "month" needs to be specified in the "required_intervals" entry:
 
-**Example**: "sos" : { "required_intervals" : { "leadtime" : "mon" } }
-
-Using the initdate and runlength arguments, the script will then determine
-the expected data intervals, which are subsequently compared to the intervals
-found in the monthly file.
+**Example**: "sos" : { "required_intervals" : { "leadtime" : "month" } }
 
 ## required_min_max
 

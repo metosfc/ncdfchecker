@@ -195,13 +195,13 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
 
 def get_period_stepsize(leadtimes, forecast_ref_time, period):
     """
-    Get the stepsize over the specified period
+    Get the stepsize over the specified period.
 
     """
     # Leadtimes given in the file are expressed in hours since the
     # forecast reference time (i.e. forecast start date), so we need
-    # to convert these into datetime objects before we can expressed
-    # the required period to check the intervl for.
+    # to convert these into datetime objects before we can extract the
+    # required period to check the interval for.
     ref_time = dateutil.parser.parse(forecast_ref_time)
 
     datetimes = [
@@ -209,14 +209,13 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
         for leadtime in leadtimes
     ]
 
-    # Get the appropriate time period (year, month, day etc), and then
-    # determine the interval along that period. Month intervals need to be
-    # converted into modulo 12 to handle year changes.
+    # Get the required time period (e.g. month, year) and then
+    # determine the interval along that period. Month intervals need
+    # to be converted into modulo 12 to handle year changes.
     periods = np.array([
         getattr(datetime, period) for datetime in datetimes
     ])
 
-    # Clarify the function of the modulo
     stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
     if period == 'month':
         stepsizes %= 12
@@ -225,14 +224,13 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
 
 
 def check_stepsize(data, stepsize, forecast_ref_time=None, period=None):
-
     """
     Helper routine to check that the stepsize in some given data is
-    equal to a given value.
+    equal to a given value. If a time period is given, we check the
+    stepsize along that period, otherwise we just check neighbouring
+    data points (e.g. for grid point data).
 
     """
-    # If no period is specified, just check interval between
-    # neighbouring data points (e.g. for grid-points).
     if period is None:
         steparr = data[1:len(data)] - data[0:len(data)-1]
     else:
@@ -347,6 +345,7 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
 
                                 if not check_stepsize(arr, step, startdate,
                                                       period):
+                                    print(arr, step, period)
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))
                                     errcount += 1
