@@ -362,7 +362,7 @@ class TestMonthlyProductValidator(unittest.TestCase):
         self.time_vals = numpy.array([372.0, 1080.0, 1788.0, 2520.0, 3252.0])
         self.freq = 'mon'
 
-        # Substitute the 6-hourly field with the monthly values.
+        # Substitute the 6-hourly field with the monthly settings..
         self.monthly_constraints = copy.deepcopy(test_constraints)
         self.monthly_constraints['testfield']['frequency'] = 'mon'
         self.monthly_constraints['testfield']['required_intervals']['time'] = \
@@ -438,6 +438,8 @@ class TestYearlyProductValidator(unittest.TestCase):
     def setUp(self):
         self.time_vals = numpy.array([4380., 13140.])
         self.freq = 'year'
+
+        # Replace the 6-hourly field with yerly settings.
         self.yearly_constraints = copy.deepcopy(test_constraints)
         self.yearly_constraints['testfield']['frequency'] = 'year'
         self.yearly_constraints['testfield']['required_intervals']['time'] = \
