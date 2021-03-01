@@ -42,6 +42,8 @@ import netCDF4
 
 import numpy as np
 
+ALLOWED_PERIODS = ('year', 'month')
+
 
 class LevelFilter(logging.Filter):
     """
@@ -196,8 +198,6 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
     Get the stepsize over the specified period
 
     """
-    NMONTHS = 12
-
     # Leadtimes given in the file are expressed in hours since the
     # forecast reference time (i.e. forecast start date), so we need
     # to convert these into datetime objects before we can expressed
@@ -216,9 +216,10 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
         getattr(datetime, period) for datetime in datetimes
     ])
 
+    # Clarify the function of the modulo
     stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
     if period == 'month':
-        stepsizes %= NMONTHS
+        stepsizes %= 12
 
     return stepsizes
 
@@ -227,13 +228,11 @@ def check_stepsize(data, stepsize, forecast_ref_time=None, period=None):
 
     """
     Helper routine to check that the stepsize in some given data is
-    equal to a given value. Monthly step sizes are dependent on the
-    months covered on the model run. We therefore compare these to an
-    array of expected values.
+    equal to a given value.
 
     """
-    # If no period is specified, just check the hourly interval in the
-    # data, otherwise we check the interval for the specified period.
+    # If no period is specified, just check interval between
+    # neighbouring data points (e.g. for grid-points).
     if period is None:
         steparr = data[1:len(data)] - data[0:len(data)-1]
     else:
@@ -325,20 +324,28 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
                                 arr = product[intervalkey][:]
                                 step = constraints[variable][key][intervalkey]
 
-                                fcst_ref_time = product.forecast_reference_time
+                                startdate = product.forecast_reference_time
                                 # Check that monthly or yearly files
                                 # have a stepsize of 1 month or 1
                                 # year. Otherwise we use the hourly
                                 # value specified in the json file.
-                                period = None
+                                # Monthly or yearly files are
+                                # specified with "month" or "year" in
+                                # the json file, respectively.
+                                period = 'hour'
                                 if isinstance(step, str):
-                                    if step in ['month', 'year']:
+                                    if step in ALLOWED_PERIODS:
+                                        # Replace the period with the
+                                        # string given in the json
+                                        # file, and specify a
+                                        # step-size of 1.
                                         period, step = step, 1
                                     else:
-                                        sys.exit(f'Interval checks for period '
-                                                 '{step} not yet implemented.')
+                                        sys.exit(
+                                            f'Interval checks for period '
+                                            '{step} not yet implemented.')
 
-                                if not check_stepsize(arr, step, fcst_ref_time,
+                                if not check_stepsize(arr, step, startdate,
                                                       period):
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))

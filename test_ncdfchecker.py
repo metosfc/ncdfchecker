@@ -515,7 +515,8 @@ class TestMonthlyProductValidator(unittest.TestCase):
 class TestGetPeriodStepsize(unittest.TestCase):
 
     def setUp(self):
-        self.period = 'month'
+        self.period_month = 'month'
+        self.period_year = 'year'
 
     def test_get_expected_monthly_stepsize__month_start(self):
         """
@@ -526,7 +527,7 @@ class TestGetPeriodStepsize(unittest.TestCase):
         leadtimes = np.array([360., 1092., 1824., 2556., 3300., 4032., 4764.])
         expected_stepsizes = np.array([1., 1., 1., 1., 1., 1.])
 
-        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
         print(stepsizes)
 
         self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
@@ -541,7 +542,7 @@ class TestGetPeriodStepsize(unittest.TestCase):
         leadtimes = np.array([900., 1632., 2364., 3108., 3840., 4572.])
         expected_stepsizes = np.array([1., 1., 1., 1., 1.])
 
-        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
 
         self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
 
@@ -555,7 +556,7 @@ class TestGetPeriodStepsize(unittest.TestCase):
         leadtimes = np.array([360., 1092., 1836., 2544., 3252., 3984.])
         expected_stepsizes = np.array([1., 1., 1., 1., 1.])
 
-        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period)
+        stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
 
         self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
 
