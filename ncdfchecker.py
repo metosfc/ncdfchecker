@@ -201,7 +201,7 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
     # Leadtimes given in the file are expressed in hours since the
     # forecast reference time (i.e. forecast start date), so we need
     # to convert these into datetime objects before we can extract the
-    # required period to check the interval for.
+    # required period for which we need to check the interval.
     ref_time = dateutil.parser.parse(forecast_ref_time)
 
     datetimes = [
@@ -345,7 +345,6 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
 
                                 if not check_stepsize(arr, step, startdate,
                                                       period):
-                                    print(arr, step, period)
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))
                                     errcount += 1
