@@ -110,6 +110,12 @@ For example you may have be outputting various variables at different timesteps
 depending on what that variable is e.g. tas with a leadtime of 6.0 while tauv
 has a leadtime of 24.
 
+To indicate that a particular field is output in monthly or yearly
+intervals, then "month" or "year" must be specified in the
+"required_intervals" entry:
+
+**Example**: "sos" : { "required_intervals" : { "leadtime" : "month" } }
+
 ## required_min_max
 
 Use this to specify the expected minimum and maximum values. This is an
@@ -145,6 +151,21 @@ check will still fail if they are not in the expected order.
 **Format**: List of items in the order you expect them as [item1, item2, ... itemN]
 
 **Example**: "lon" : { "required_values": [0.0, 180.0, 360.0] }
+
+# Other top-level items
+
+This section summarises other top-level entries.
+
+## allowed_dimensions
+
+Use this entry to list the allowed dimensions that can be found in your
+netcdf variables.
+
+**Location**: Top level entry in the dictionary
+
+**Format**: List of names of the allowed dimensions
+
+**Example**: "allowed_dimensions": ["plev", "depth", "height"]
 
 # Other reserved config items
 

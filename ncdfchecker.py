@@ -31,6 +31,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import datetime
+import dateutil.parser
 import json
 import logging
 import re
@@ -39,6 +41,8 @@ import sys
 import netCDF4
 
 import numpy as np
+
+ALLOWED_PERIODS = ('year', 'month')
 
 
 class LevelFilter(logging.Filter):
@@ -165,7 +169,7 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
                         else:
                             logger.error(
                                 "Check for %s, %s not implemented" %
-                                (key, confkey))
+                                (key, conkey))
                             errcount += 1
                 else:
                     logger.warn("Constraint on %s is not defined" % key)
@@ -189,12 +193,49 @@ def check_globals(product, constraints, skip=["short_name"], strict=False,
     return errcount, warncount
 
 
-def check_stepsize(data, stepsize):
+def get_period_stepsize(leadtimes, forecast_ref_time, period):
     """
-    Helper routine to check that the stepsize in some given data is equal to
-    a given value
+    Get the stepsize over the specified period.
+
     """
-    steparr = data[1:len(data)] - data[0:len(data)-1]
+    # Leadtimes given in the file are expressed in hours since the
+    # forecast reference time (i.e. forecast start date), so we need
+    # to convert these into datetime objects before we can extract the
+    # required period for which we need to check the interval.
+    ref_time = dateutil.parser.parse(forecast_ref_time)
+
+    datetimes = [
+        ref_time + datetime.timedelta(hours=leadtime)
+        for leadtime in leadtimes
+    ]
+
+    # Get the required time period (e.g. month, year) and then
+    # determine the interval along that period. Month intervals need
+    # to be converted into modulo 12 to handle year changes.
+    periods = np.array([
+        getattr(datetime, period) for datetime in datetimes
+    ])
+
+    stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
+    if period == 'month':
+        stepsizes %= 12
+
+    return stepsizes
+
+
+def check_stepsize(data, stepsize, forecast_ref_time=None, period=None):
+    """
+    Helper routine to check that the stepsize in some given data is
+    equal to a given value. If a time period is given, we check the
+    stepsize along that period, otherwise we just check neighbouring
+    data points (e.g. for grid point data).
+
+    """
+    if period is None:
+        steparr = data[1:len(data)] - data[0:len(data)-1]
+    else:
+        steparr = get_period_stepsize(data, forecast_ref_time, period)
+
     return np.all(steparr == stepsize)
 
 
@@ -280,7 +321,30 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
                             if intervalkey in product.variables:
                                 arr = product[intervalkey][:]
                                 step = constraints[variable][key][intervalkey]
-                                if not check_stepsize(arr, step):
+
+                                startdate = product.forecast_reference_time
+                                # Check that monthly or yearly files
+                                # have a stepsize of 1 month or 1
+                                # year. Otherwise we use the hourly
+                                # value specified in the json file.
+                                # Monthly or yearly files are
+                                # specified with "month" or "year" in
+                                # the json file, respectively.
+                                period = 'hour'
+                                if isinstance(step, str):
+                                    if step in ALLOWED_PERIODS:
+                                        # Replace the period with the
+                                        # string given in the json
+                                        # file, and specify a
+                                        # step-size of 1.
+                                        period, step = step, 1
+                                    else:
+                                        sys.exit(
+                                            f'Interval checks for period '
+                                            '{step} not yet implemented.')
+
+                                if not check_stepsize(arr, step, startdate,
+                                                      period):
                                     logger.error(
                                         "%s: %s not matched" % (variable, key))
                                     errcount += 1
@@ -407,6 +471,7 @@ if __name__ == "__main__":
     # Variable Checks
     errs, warns = simple_variable_checks(product, constraints, args.strict,
                                          logger=logger)
+
     errcount += errs
     warncount += warns
 
