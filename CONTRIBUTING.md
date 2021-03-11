@@ -24,6 +24,23 @@ Prior to requesting review of a pull request, please ensure that tests are
 fully working and have been added to as necessary, and that code is pep8
 compliant.
 
+## Development Principles
+
+Some useful principles to follow when you want to make a code contribution:
+
+* When contributing to this codebase please use the forking workflow 
+  https://www.atlassian.com/git/tutorials/comparing-workflows/forking-workflow
+  to carry out your development work in your own fork and then raise pull requests
+  against the main repository when you are ready.
+
+* When adding to/extending/altering the code remember that the tool is intended
+  to be driven by the contents of a provided config file. This means that any
+  desired behaviour should be captured in the form of a config item rather than
+  specifically catering for it in code.
+
+* Double check if an existing config item covers what you need or if it is very
+  close to what you want. This may save you time and effort!
+
 ## Code Contributors
 
 The following people have contributed to this code under the terms of
