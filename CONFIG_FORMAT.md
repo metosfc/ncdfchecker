@@ -111,7 +111,7 @@ depending on what that variable is e.g. tas with a leadtime of 6.0 while tauv
 has a leadtime of 24.
 
 To indicate that a particular field is output in monthly or yearly
-intervals, then "month" or "year" must be specified in the
+intervals, then "month" or "years" must be specified in the
 "required_intervals" entry:
 
 **Example**: "sos" : { "required_intervals" : { "leadtime" : "month" } }

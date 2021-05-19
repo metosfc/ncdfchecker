@@ -31,7 +31,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import copy
-import datetime
 import os
 import json
 import unittest
@@ -43,7 +42,6 @@ import logging
 
 from ncdfchecker import *
 
-import numpy as np
 
 TEMPDIR = tempfile.mkdtemp()
 datapath = os.path.join(TEMPDIR, "test.nc")
@@ -215,6 +213,8 @@ class TestProductValidator(unittest.TestCase):
         create_example_files()
         self.data = load_input(datapath)
 
+        self.by_hours = 'hours'
+
     def tearDown(self):
         """
         Cleanup temporary files
@@ -263,14 +263,18 @@ class TestProductValidator(unittest.TestCase):
         Test check correct stepsize matching
         """
         step = test_constraints['testfield']['required_intervals']['time']
-        assert check_stepsize(self.data['time'][:], step)
+        assert check_stepsize(self.data['time'][:], step,
+                              self.data.forecast_reference_time,
+                              self.by_hours)
 
     def test_check_stepsize_fail(self):
         """
         Test check stepsize fails on mismatch
         """
         step = test_constraints['testfield']['required_intervals']['time'] + 1
-        assert not (check_stepsize(self.data['time'][:], step))
+        assert not (check_stepsize(self.data['time'][:], step,
+                                   self.data.forecast_reference_time,
+                                   self.by_hours))
 
     def test_check_irregular_stepsize_fail(self):
         """
@@ -278,8 +282,10 @@ class TestProductValidator(unittest.TestCase):
         steps
         """
         step = 6
-        irregset = numpy.array([0, 8, 12, 18])
-        assert not check_stepsize(irregset, step)
+        irregset = numpy.array([0., 8., 12., 18.])
+        assert not check_stepsize(irregset, step,
+                                  self.data.forecast_reference_time,
+                                  self.by_hours)
 
     def test_check_globals_ok(self):
         """
@@ -434,23 +440,101 @@ class TestMonthlyProductValidator(unittest.TestCase):
         assert alogger.warns == ['Unknown Variable time']
 
 
+class TestDailyProductValidator(unittest.TestCase):
+    def setUp(self):
+        self.time_vals = numpy.array([
+            684., 708., 732., 756., 780., 804., 828., 852.])
+        self.freq = 'day'
+
+        # Replace the 6-hourly field with daily settings.
+        self.day_constraints = copy.deepcopy(test_constraints)
+        self.day_constraints['testfield']['frequency'] = 'day'
+        self.day_constraints['testfield']['required_intervals']['time'] = \
+            24
+
+        create_example_files(time_vals=self.time_vals, freq=self.freq,
+                             constraints=self.day_constraints)
+
+        self.data = load_input(datapath)
+        self.day_step = 1
+        self.by_day = 'days'
+
+    def tearDown(self):
+        """
+        Cleanup temporary files.
+        """
+        try:
+            os.remove(datapath)
+        except OSError:
+            pass
+        return
+
+    def test_load_constraints_ok(self):
+        """
+        Check constraints load ok for daily meta-data.
+        """
+        cons = load_constraints(jsonpath)
+        assert cons == self.day_constraints
+
+    def test_check_stepsize_ok(self):
+        """
+        Test correct daily stepsize matching.
+        """
+        assert check_stepsize(
+            self.data['time'][:], self.day_step,
+            self.data.forecast_reference_time, self.by_day)
+
+    def test_check_stepsize_fail(self):
+        """
+        Check failure upon daily stepsize mismatch.
+        """
+        step = self.day_step + 1
+        assert not check_stepsize(
+            self.data['time'][:], step, self.data.forecast_reference_time,
+            self.by_day)
+
+    def test_check_stepsize_irregular_stepsize_fails(self):
+        """
+        Check failure upon mismatch due to irregular intervals.
+        """
+        irregular = numpy.array([
+            684., 708., 756., 780., 828., 852., 876., 900.])
+        assert not check_stepsize(
+            irregular, self.day_step,
+            self.data.forecast_reference_time, self.by_day)
+
+    def test_simple_variable_checks(self):
+        """
+        Check simple_variable_checks runs and finds a warning
+        because the constraint does not define time tests.
+        """
+        alogger = StubLogger()
+        result = simple_variable_checks(self.data, self.day_constraints,
+                                        logger=alogger)
+
+        assert result == (0, 1)
+        assert alogger.errors == []
+        assert alogger.infos[0] == 'Checking time'
+        assert alogger.warns == ['Unknown Variable time']
+
+
 class TestYearlyProductValidator(unittest.TestCase):
     def setUp(self):
         self.time_vals = numpy.array([4380., 13140.])
-        self.freq = 'year'
+        self.freq = 'years'
 
-        # Replace the 6-hourly field with yerly settings.
+        # Replace the 6-hourly field with yearly settings.
         self.yearly_constraints = copy.deepcopy(test_constraints)
-        self.yearly_constraints['testfield']['frequency'] = 'year'
+        self.yearly_constraints['testfield']['frequency'] = 'years'
         self.yearly_constraints['testfield']['required_intervals']['time'] = \
-            'year'
+            'years'
 
         create_example_files(time_vals=self.time_vals, freq=self.freq,
                              constraints=self.yearly_constraints)
 
         self.data = load_input(datapath)
         self.yearly_step = 1
-        self.by_year = 'year'
+        self.by_year = 'years'
 
     def tearDown(self):
         """
@@ -515,7 +599,51 @@ class TestGetPeriodStepsize(unittest.TestCase):
 
     def setUp(self):
         self.period_month = 'month'
-        self.period_year = 'year'
+        self.period_year = 'years'
+        self.period_day = 'days'
+        self.period_hours = 'hours'
+
+    def test_get_expected_hourly_stepsize__6hr(self):
+        """
+        Check that the correct step size array is returned for 6-hourly
+        data. Use data that straddles the month boundary.
+        """
+        ref_time = "2021-05-10T00:00:00Z"
+        leadtimes = numpy.array(
+            [504., 510., 516., 522., 528., 534., 540., 546.])
+        expected_stepsizes = numpy.array([6., 6., 6., 6., 6., 6., 6.])
+
+        stepsizes = get_period_stepsize(
+            leadtimes, ref_time, self.period_hours)
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
+
+    def test_get_expected_stepsize__12hr(self):
+        """
+        Check that the correct step size array is returned for 12-hourly
+        data. Use data that straddles the month boundary.
+        """
+        ref_time = "2021-05-10T00:00:00Z"
+        leadtimes = numpy.array(
+            [504., 516., 528., 540., 552., 564., 576., 588.])
+        expected_stepsizes = numpy.array([12., 12., 12., 12., 12., 12., 12.])
+
+        stepsizes = get_period_stepsize(
+            leadtimes, ref_time, self.period_hours)
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
+
+    def test_get_expected_stepsize__1day(self):
+        """
+        Check that the correct step size array is returned for daily
+        data. Use data that straddles the month boundary.
+        """
+        ref_time = "2021-05-10T00:00:00Z"
+        leadtimes = numpy.array(
+            [468., 492., 516., 540., 564., 588., 612., 636.])
+        expected_stepsizes = numpy.array([1., 1., 1., 1., 1., 1., 1.])
+
+        stepsizes = get_period_stepsize(
+            leadtimes, ref_time, self.period_day)
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
     def test_get_expected_monthly_stepsize__month_start(self):
         """
@@ -523,13 +651,13 @@ class TestGetPeriodStepsize(unittest.TestCase):
         model initialisation date is at the start of the month.
         """
         ref_time = '1995-04-01T00:00:00Z'
-        leadtimes = np.array([360., 1092., 1824., 2556., 3300., 4032., 4764.])
-        expected_stepsizes = np.array([1., 1., 1., 1., 1., 1.])
+        leadtimes = numpy.array(
+            [360., 1092., 1824., 2556., 3300., 4032., 4764.])
+        expected_stepsizes = numpy.array([1., 1., 1., 1., 1., 1.])
 
         stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
-        print(stepsizes)
 
-        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
     def test_get_expected_monthly_stepsize__mid_month(self):
         """
@@ -538,12 +666,12 @@ class TestGetPeriodStepsize(unittest.TestCase):
 
         """
         ref_time = '1994-04-09T00:00:00Z'
-        leadtimes = np.array([900., 1632., 2364., 3108., 3840., 4572.])
-        expected_stepsizes = np.array([1., 1., 1., 1., 1.])
+        leadtimes = numpy.array([900., 1632., 2364., 3108., 3840., 4572.])
+        expected_stepsizes = numpy.array([1., 1., 1., 1., 1.])
 
         stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
 
-        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
     def test_get_expected_monthly_stepsize__edge(self):
         """
@@ -552,12 +680,12 @@ class TestGetPeriodStepsize(unittest.TestCase):
 
         """
         ref_time = '2020-11-01T00:00:00Z'
-        leadtimes = np.array([360., 1092., 1836., 2544., 3252., 3984.])
-        expected_stepsizes = np.array([1., 1., 1., 1., 1.])
+        leadtimes = numpy.array([360., 1092., 1836., 2544., 3252., 3984.])
+        expected_stepsizes = numpy.array([1., 1., 1., 1., 1.])
 
         stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_month)
 
-        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
     def test_get_expected_yearly_stepsize__non_leap(self):
         """
@@ -567,11 +695,11 @@ class TestGetPeriodStepsize(unittest.TestCase):
         """
         ref_time = '2017-01-01T00:00:00Z'
         leadtimes = [8760., 17520.]
-        expected_stepsizes = np.array([1.])
+        expected_stepsizes = numpy.array([1.])
 
         stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_year)
 
-        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
     def test_get_expected_yearly_stepsize__leap(self):
         """
@@ -581,11 +709,11 @@ class TestGetPeriodStepsize(unittest.TestCase):
         """
         ref_time = '2020-01-01T00:00:00Z'
         leadtimes = [8784., 17544.]
-        expected_stepsizes = np.array([1.])
+        expected_stepsizes = numpy.array([1.])
 
         stepsizes = get_period_stepsize(leadtimes, ref_time, self.period_year)
 
-        self.assertTrue(np.array_equal(expected_stepsizes, stepsizes))
+        self.assertTrue(numpy.array_equal(expected_stepsizes, stepsizes))
 
 
 if __name__ == '__main__':
