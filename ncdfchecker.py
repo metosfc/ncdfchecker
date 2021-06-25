@@ -38,11 +38,13 @@ import logging
 import re
 import sys
 
+from dateutil.relativedelta import relativedelta
+
 import netCDF4
 
 import numpy as np
 
-ALLOWED_PERIODS = ('year', 'month')
+ALLOWED_PERIODS = ('years', 'month')
 
 
 class LevelFilter(logging.Filter):
@@ -209,16 +211,23 @@ def get_period_stepsize(leadtimes, forecast_ref_time, period):
         for leadtime in leadtimes
     ]
 
-    # Get the required time period (e.g. month, year) and then
-    # determine the interval along that period. Month intervals need
-    # to be converted into modulo 12 to handle year changes.
-    periods = np.array([
-        getattr(datetime, period) for datetime in datetimes
-    ])
-
-    stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
+    # Determine the time interval over the specified time
+    # period (e.g. hours, days). For months, since it is not
+    # a standard unit of time, we just check that the month
+    # number increments by one. Month intervals also need to
+    # be converted into modulo 12 to handle year changes.
     if period == 'month':
+        periods = np.array([
+            getattr(datetime, period) for datetime in datetimes
+        ])
+
+        stepsizes = periods[1:len(periods)] - periods[0:len(periods)-1]
         stepsizes %= 12
+    else:
+        stepsizes = np.array([
+            getattr(relativedelta(datetimes[i+1], datetimes[i]), period)
+            for i in range(len(datetimes)-1)
+            ])
 
     return stepsizes
 
@@ -328,9 +337,8 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
                                 # year. Otherwise we use the hourly
                                 # value specified in the json file.
                                 # Monthly or yearly files are
-                                # specified with "month" or "year" in
+                                # specified with "month" or "years" in
                                 # the json file, respectively.
-                                period = 'hour'
                                 if isinstance(step, str):
                                     if step in ALLOWED_PERIODS:
                                         # Replace the period with the
@@ -342,6 +350,15 @@ def simple_variable_checks(product, constraints, strict=False, logger=None):
                                         sys.exit(
                                             f'Interval checks for period '
                                             '{step} not yet implemented.')
+                                else:
+                                    # If the interval given in the json
+                                    # file is 24 hours, then specify a period
+                                    # of "days" over which to perform the
+                                    # interval check.
+                                    if step == 24:
+                                        period, step = 'days', 1
+                                    else:
+                                        period = 'hours'
 
                                 if not check_stepsize(arr, step, startdate,
                                                       period):
