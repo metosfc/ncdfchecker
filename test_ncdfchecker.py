@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # -----------------------------------------------------------------------------
-# (C) British Crown Copyright 2018-2019 Met Office.
+# (C) British Crown Copyright 2018-2021 Met Office.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
